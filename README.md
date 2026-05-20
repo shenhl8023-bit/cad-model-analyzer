@@ -241,6 +241,17 @@ D:\CodeProj\cad-model-analyzer\run-analyzer.bat --help
 D:\CodeProj\cad-model-analyzer\run-analyzer.bat --version
 ```
 
+批量分析目录并输出每个模型的 JSON 和 CSV 汇总：
+
+```bat
+D:\CodeProj\cad-model-analyzer\run-analyzer.bat --batch D:\models\step-files -o D:\models\cad-report
+```
+
+批量模式会生成：
+
+- `summary.csv`：每个 STEP 文件一行，包含实体数、面数、边数、自由边、非流形边、体积、面积、耗时和报告文件名。
+- `<model-name>.json`：每个模型的完整 JSON 分析报告。
+
 示例：
 
 ```bat
@@ -263,6 +274,7 @@ D:\CodeProj\cad-model-analyzer\test-screw.bat
 - `--version` 能正常运行
 - `-o output.json` 写法可用
 - 旧版 `input.step output.json` 写法可用
+- `--batch input_dir -o output_dir` 批量分析可用
 - `screw.step` 的关键拓扑/几何统计符合预期
 - metadata、metrics、quality 字段存在
 - free edge / non-manifold edge / closed solid candidate 等质检字段符合预期
@@ -279,13 +291,18 @@ OK: screw.step report matches expected counts, metrics, and CLI options
 
 完整示例见：[`docs/demo-report.json`](docs/demo-report.json)
 
+批量输出示例：
+
+- [`docs/demo-summary.csv`](docs/demo-summary.csv)
+- [`docs/demo-batch-screw.json`](docs/demo-batch-screw.json)
+
 节选：
 
 ```json
 {
   "metadata": {
     "analyzer": "cad_model_analyzer",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "input_file": "samples/screw.step",
     "analysis_time_ms": 20
   },

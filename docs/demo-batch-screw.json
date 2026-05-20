@@ -2,10 +2,10 @@
   "metadata": {
     "analyzer": "cad_model_analyzer",
     "version": "0.3.0",
-    "input_file": "samples/screw.step",
+    "input_file": "D:\\CodeProj\\cad-model-analyzer\\output\\batch-input\\screw.step",
     "analysis_time_ms": 20
   },
-  "file": "samples/screw.step",
+  "file": "D:\\CodeProj\\cad-model-analyzer\\output\\batch-input\\screw.step",
   "topology": {
     "vertex": 88,
     "edge": 44,

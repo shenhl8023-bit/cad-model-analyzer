@@ -351,7 +351,7 @@ diagonal = sqrt(dx * dx + dy * dy + dz * dz);
 {
   "metadata": {
     "analyzer": "cad_model_analyzer",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "input_file": "samples/screw.step",
     "analysis_time_ms": 20
   },
@@ -474,13 +474,18 @@ D:\CodeProj\CoreEngine\occt-combined-release-no-pch\opencascade-8.0.0-vc14-64\da
 
 ### 2. 批量分析
 
-支持目录输入：
+已支持目录输入：
 
 ```bat
 cad_model_analyzer.exe --batch models -o reports
 ```
 
-输出多个 JSON 和一个 `summary.csv`。
+输出：
+
+- `reports/summary.csv`：汇总每个模型的状态、实体数、面数、边数、自由边、非流形边、体积、面积、耗时和 JSON 文件名。
+- `reports/<model>.json`：每个模型的完整分析报告。
+
+这部分把单模型分析扩展成批处理能力，便于后续接入模型库、报价系统或质检流水线。
 
 ### 3. 更多格式支持
 

@@ -1,0 +1,2 @@
+file,status,solid,face,edge,free_edge,non_manifold_edge,volume,surface_area,analysis_time_ms,report
+screw.step,ok,1,10,44,0,0,3788.27,1929.33,20,screw.json

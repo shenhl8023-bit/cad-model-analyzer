@@ -14,6 +14,7 @@ find_package(OpenCASCADE REQUIRED)
 
 add_executable(cad_model_analyzer
     src/main.cpp
+    src/Analysis.cpp
     src/StepReader.cpp
     src/TopologyCounter.cpp
     src/GeometryClassifier.cpp

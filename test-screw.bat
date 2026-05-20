@@ -5,9 +5,14 @@ set "ROOT=%~dp0"
 set "INPUT=D:\CodeProj\CoreEngine\occt-combined-release-no-pch\opencascade-8.0.0-vc14-64\data\step\screw.step"
 set "OUTPUT=%ROOT%output\test-screw-report.json"
 set "OUTPUT_O=%ROOT%output\test-screw-report-o.json"
+set "BATCH_INPUT=%ROOT%output\batch-input"
+set "BATCH_OUTPUT=%ROOT%output\batch-report"
 set "EXE=%ROOT%build\x64-release\cad_model_analyzer.exe"
 
 if not exist "%ROOT%output" mkdir "%ROOT%output"
+if not exist "%BATCH_INPUT%" mkdir "%BATCH_INPUT%"
+if exist "%BATCH_OUTPUT%" rmdir /s /q "%BATCH_OUTPUT%"
+copy /y "%INPUT%" "%BATCH_INPUT%\screw.step" >nul
 
 "%EXE%" --help >nul
 if errorlevel 1 exit /b %errorlevel%
@@ -21,11 +26,20 @@ if errorlevel 1 exit /b %errorlevel%
 call "%ROOT%run-analyzer.bat" "%INPUT%" "%OUTPUT%" >nul
 if errorlevel 1 exit /b %errorlevel%
 
+call "%ROOT%run-analyzer.bat" --batch "%BATCH_INPUT%" -o "%BATCH_OUTPUT%" >nul
+if errorlevel 1 exit /b %errorlevel%
+
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$r = Get-Content '%OUTPUT%' -Raw | ConvertFrom-Json;" ^
   "$ro = Get-Content '%OUTPUT_O%' -Raw | ConvertFrom-Json;" ^
+  "if (!(Test-Path '%BATCH_OUTPUT%\summary.csv')) { throw 'missing batch summary.csv' };" ^
+  "if (!(Test-Path '%BATCH_OUTPUT%\screw.json')) { throw 'missing batch screw.json' };" ^
+  "$rb = Get-Content '%BATCH_OUTPUT%\screw.json' -Raw | ConvertFrom-Json;" ^
+  "$summary = Get-Content '%BATCH_OUTPUT%\summary.csv' -Raw;" ^
+  "if ($summary -notmatch 'file,status,solid,face,edge,free_edge,non_manifold_edge,volume,surface_area') { throw 'summary header mismatch' };" ^
+  "if ($summary -notmatch 'screw.step,ok,1,10,44,0,0') { throw 'summary row mismatch' };" ^
   "if ($null -eq $r.metadata) { throw 'missing metadata' };" ^
-  "if ($r.metadata.version -ne '0.2.0') { throw 'version mismatch' };" ^
+  "if ($r.metadata.version -ne '0.3.0') { throw 'version mismatch' };" ^
   "if ($r.metadata.analysis_time_ms -lt 0) { throw 'invalid analysis time' };" ^
   "if ($r.topology.solid -ne 1) { throw 'solid count mismatch' };" ^
   "if ($r.topology.face -ne 10) { throw 'face count mismatch' };" ^
@@ -50,4 +64,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "if ($r.quality.has_non_manifold_edges -ne $false) { throw 'non-manifold quality mismatch' };" ^
   "if ($r.quality.has_positive_volume -ne $true) { throw 'positive volume quality mismatch' };" ^
   "if ($ro.topology.face -ne $r.topology.face) { throw '-o output mismatch' };" ^
+  "if ($rb.topology.face -ne $r.topology.face) { throw 'batch json mismatch' };" ^
   "Write-Output 'OK: screw.step report matches expected counts, metrics, and CLI options'"
