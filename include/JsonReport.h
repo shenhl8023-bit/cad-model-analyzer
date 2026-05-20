@@ -8,6 +8,8 @@
 
 std::string buildJsonReport(
     const std::string& inputFile,
+    const std::string& analyzerVersion,
+    long long analysisTimeMs,
     const TopologyStats& topology,
     const CurveStats& curves,
     const SurfaceStats& surfaces,

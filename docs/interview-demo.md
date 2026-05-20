@@ -6,7 +6,7 @@
 
 ## 30 秒版本
 
-> 我做了一个基于 C++ 和 OpenCASCADE 的 CAD 模型分析工具。它可以读取 STEP 文件，把模型解析成 OpenCASCADE 的 `TopoDS_Shape`，然后遍历 B-Rep 拓扑结构，统计 Vertex、Edge、Face、Solid 等数量，同时识别常见曲线和曲面类型，并计算包围盒、表面积、体积和质心，最后输出 JSON 报告。这个项目主要是为了展示我对 CAD 几何内核、C++ 工程化和模型数据分析流程的理解。
+> 我做了一个基于 C++ 和 OpenCASCADE 的 CAD 模型分析工具。它可以读取 STEP 文件，把模型解析成 OpenCASCADE 的 `TopoDS_Shape`，然后遍历 B-Rep 拓扑结构，统计 Vertex、Edge、Face、Solid 等数量，同时识别常见曲线和曲面类型，计算包围盒、表面积、体积和质心，并检查自由边、非流形边等基础模型质量问题，最后输出 JSON 报告。这个项目主要是为了展示我对 CAD 几何内核、B-Rep 拓扑、C++ 工程化和模型数据分析流程的理解。
 
 ---
 
@@ -14,9 +14,9 @@
 
 > 这个项目的背景是我想补足 CAD/CAE 方向的工程实践，所以选择 OpenCASCADE 做了一个 STEP 模型分析工具。
 >
-> 整体流程是：先通过 `STEPControl_Reader` 读取 STEP 文件，转换成 OpenCASCADE 的 `TopoDS_Shape`。然后我把分析逻辑拆成几个模块：`TopologyCounter` 负责拓扑统计，`GeometryClassifier` 负责识别 Edge 的曲线类型和 Face 的曲面类型，`ShapeMetrics` 负责计算包围盒、面积、体积、质心，最后 `JsonReport` 把结果输出成 JSON。
+> 整体流程是：先通过 `STEPControl_Reader` 读取 STEP 文件，转换成 OpenCASCADE 的 `TopoDS_Shape`。然后我把分析逻辑拆成几个模块：`TopologyCounter` 负责拓扑统计和基础质量检查，`GeometryClassifier` 负责识别 Edge 的曲线类型和 Face 的曲面类型，`ShapeMetrics` 负责计算包围盒、面积、体积、质心，最后 `JsonReport` 把结果输出成 JSON。
 >
-> 这个项目不是只做文件读取，而是围绕 B-Rep 模型做结构化分析。比如 Edge 本身只是拓扑边，要通过 `BRep_Tool::Curve` 拿到底层几何曲线；Face 也要通过 `BRep_Tool::Surface` 拿到底层曲面。质量属性则用 `BRepGProp::SurfaceProperties` 和 `BRepGProp::VolumeProperties` 来计算。
+> 这个项目不是只做文件读取，而是围绕 B-Rep 模型做结构化分析。比如 Edge 本身只是拓扑边，要通过 `BRep_Tool::Curve` 拿到底层几何曲线；Face 也要通过 `BRep_Tool::Surface` 拿到底层曲面。模型质量检查则通过 `TopExp::MapShapesAndAncestors` 建立 Edge 到 Face 的邻接关系，用来判断自由边和非流形边。质量属性用 `BRepGProp::SurfaceProperties` 和 `BRepGProp::VolumeProperties` 来计算。
 >
 > 工程化方面，我用 CMake + Ninja + MSVC 构建，并写了 `build-windows.bat`、`run-analyzer.bat` 和 `test-screw.bat`。因为 OpenCASCADE 在 Windows 下有比较多 DLL 依赖，所以我也处理了运行时 PATH 和依赖复制问题。最后用 OCCT 自带的 `screw.step` 做了一个最小回归测试，确保拓扑统计、几何分类和 metrics 字段稳定输出。
 
@@ -52,11 +52,11 @@ JSON 报告
 
 讲解点：
 
-> 拓扑统计使用 `TopExp_Explorer`。它可以从一个 `TopoDS_Shape` 中遍历指定类型，比如 `TopAbs_FACE` 或 `TopAbs_EDGE`。我把统计逻辑封装成 `countShapeType`，分别统计 Vertex、Edge、Wire、Face、Shell、Solid 和 Compound。
+> 拓扑统计使用 `TopExp_Explorer`。它可以从一个 `TopoDS_Shape` 中遍历指定类型，比如 `TopAbs_FACE` 或 `TopAbs_EDGE`。我把统计逻辑封装成 `countShapeType`，分别统计 Vertex、Edge、Wire、Face、Shell、Solid 和 Compound。同时我还计算了 `V - E + F` 欧拉特征数，并用 `TopExp::MapShapesAndAncestors` 建立 Edge 到 Face 的邻接关系，用来统计 free edge 和 non-manifold edge。
 
 可以提到：
 
-> 这里体现了 B-Rep 的拓扑层级概念。CAD 模型不是一个三角网格，而是由拓扑对象和几何对象共同构成。
+> 这里体现了 B-Rep 的拓扑层级概念。CAD 模型不是一个三角网格，而是由拓扑对象和几何对象共同构成。自由边和非流形边检查也能体现模型质量检查思路，面试官会更容易看出这不是只做了文件读取。
 
 ### 4. 几何分类
 

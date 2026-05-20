@@ -8,6 +8,7 @@
 
 #include <windows.h>
 
+#include <chrono>
 #include <exception>
 #include <iostream>
 #include <string>
@@ -87,12 +88,16 @@ int main(int argc, char** argv) {
             return 0;
         }
 
+        const auto analysisStart = std::chrono::steady_clock::now();
+
         const TopoDS_Shape shape = readStepFile(options.inputFile);
         const TopologyStats topology = countTopology(shape);
         const CurveStats curves = classifyCurves(shape);
         const SurfaceStats surfaces = classifySurfaces(shape);
         const ShapeMetrics metrics = measureShape(shape);
-        const std::string report = buildJsonReport(options.inputFile, topology, curves, surfaces, metrics);
+        const auto analysisEnd = std::chrono::steady_clock::now();
+        const auto analysisTimeMs = std::chrono::duration_cast<std::chrono::milliseconds>(analysisEnd - analysisStart).count();
+        const std::string report = buildJsonReport(options.inputFile, kVersion, analysisTimeMs, topology, curves, surfaces, metrics);
 
         writeTextFile(options.outputFile, report);
         std::cout << report;

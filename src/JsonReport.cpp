@@ -25,12 +25,26 @@ std::string jsonEscape(const std::string& value) {
 
 std::string buildJsonReport(
     const std::string& inputFile,
+    const std::string& analyzerVersion,
+    const long long analysisTimeMs,
     const TopologyStats& topology,
     const CurveStats& curves,
     const SurfaceStats& surfaces,
     const ShapeMetrics& metrics) {
+    const bool closedSolidCandidate =
+        topology.solid == 1 &&
+        topology.freeEdge == 0 &&
+        topology.nonManifoldEdge == 0 &&
+        metrics.volume > 0.0;
+
     std::ostringstream json;
     json << "{\n";
+    json << "  \"metadata\": {\n";
+    json << "    \"analyzer\": \"cad_model_analyzer\",\n";
+    json << "    \"version\": \"" << jsonEscape(analyzerVersion) << "\",\n";
+    json << "    \"input_file\": \"" << jsonEscape(inputFile) << "\",\n";
+    json << "    \"analysis_time_ms\": " << analysisTimeMs << "\n";
+    json << "  },\n";
     json << "  \"file\": \"" << jsonEscape(inputFile) << "\",\n";
     json << "  \"topology\": {\n";
     json << "    \"vertex\": " << topology.vertex << ",\n";
@@ -39,7 +53,10 @@ std::string buildJsonReport(
     json << "    \"face\": " << topology.face << ",\n";
     json << "    \"shell\": " << topology.shell << ",\n";
     json << "    \"solid\": " << topology.solid << ",\n";
-    json << "    \"compound\": " << topology.compound << "\n";
+    json << "    \"compound\": " << topology.compound << ",\n";
+    json << "    \"free_edge\": " << topology.freeEdge << ",\n";
+    json << "    \"non_manifold_edge\": " << topology.nonManifoldEdge << ",\n";
+    json << "    \"euler_characteristic\": " << topology.eulerCharacteristic << "\n";
     json << "  },\n";
     json << "  \"curves\": {\n";
     json << "    \"line\": " << curves.line << ",\n";
@@ -82,6 +99,12 @@ std::string buildJsonReport(
     json << "      \"y\": " << metrics.centerOfMass.y << ",\n";
     json << "      \"z\": " << metrics.centerOfMass.z << "\n";
     json << "    }\n";
+    json << "  },\n";
+    json << "  \"quality\": {\n";
+    json << "    \"closed_solid_candidate\": " << (closedSolidCandidate ? "true" : "false") << ",\n";
+    json << "    \"has_free_edges\": " << (topology.freeEdge > 0 ? "true" : "false") << ",\n";
+    json << "    \"has_non_manifold_edges\": " << (topology.nonManifoldEdge > 0 ? "true" : "false") << ",\n";
+    json << "    \"has_positive_volume\": " << (metrics.volume > 0.0 ? "true" : "false") << "\n";
     json << "  }\n";
     json << "}\n";
     return json.str();

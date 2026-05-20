@@ -24,8 +24,14 @@ if errorlevel 1 exit /b %errorlevel%
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$r = Get-Content '%OUTPUT%' -Raw | ConvertFrom-Json;" ^
   "$ro = Get-Content '%OUTPUT_O%' -Raw | ConvertFrom-Json;" ^
+  "if ($null -eq $r.metadata) { throw 'missing metadata' };" ^
+  "if ($r.metadata.version -ne '0.2.0') { throw 'version mismatch' };" ^
+  "if ($r.metadata.analysis_time_ms -lt 0) { throw 'invalid analysis time' };" ^
   "if ($r.topology.solid -ne 1) { throw 'solid count mismatch' };" ^
   "if ($r.topology.face -ne 10) { throw 'face count mismatch' };" ^
+  "if ($r.topology.free_edge -ne 0) { throw 'free edge count mismatch' };" ^
+  "if ($r.topology.non_manifold_edge -ne 0) { throw 'non-manifold edge count mismatch' };" ^
+  "if ($r.topology.euler_characteristic -ne 54) { throw 'euler characteristic mismatch' };" ^
   "if ($r.curves.circle -ne 20) { throw 'circle count mismatch' };" ^
   "if ($r.surfaces.torus -ne 3) { throw 'torus count mismatch' };" ^
   "if ($null -eq $r.metrics) { throw 'missing metrics' };" ^
@@ -38,5 +44,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "if ($r.metrics.surface_area -le 0) { throw 'invalid surface area' };" ^
   "if ($r.metrics.volume -le 0) { throw 'invalid volume' };" ^
   "if ($null -eq $r.metrics.center_of_mass) { throw 'missing center_of_mass' };" ^
+  "if ($null -eq $r.quality) { throw 'missing quality' };" ^
+  "if ($r.quality.closed_solid_candidate -ne $true) { throw 'closed solid candidate mismatch' };" ^
+  "if ($r.quality.has_free_edges -ne $false) { throw 'free edge quality mismatch' };" ^
+  "if ($r.quality.has_non_manifold_edges -ne $false) { throw 'non-manifold quality mismatch' };" ^
+  "if ($r.quality.has_positive_volume -ne $true) { throw 'positive volume quality mismatch' };" ^
   "if ($ro.topology.face -ne $r.topology.face) { throw '-o output mismatch' };" ^
   "Write-Output 'OK: screw.step report matches expected counts, metrics, and CLI options'"

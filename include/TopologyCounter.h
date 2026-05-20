@@ -10,6 +10,9 @@ struct TopologyStats {
     int shell = 0;
     int solid = 0;
     int compound = 0;
+    int freeEdge = 0;
+    int nonManifoldEdge = 0;
+    int eulerCharacteristic = 0;
 };
 
 TopologyStats countTopology(const TopoDS_Shape& shape);

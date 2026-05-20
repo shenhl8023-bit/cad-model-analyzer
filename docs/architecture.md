@@ -1,6 +1,6 @@
 # CAD Model Analyzer 架构说明
 
-本文档说明 CAD Model Analyzer 的模块设计、数据流和关键 OpenCASCADE API。目标是让面试官或代码阅读者快速理解：一个 STEP 文件如何被转换成结构化 JSON 分析报告。
+本文档说明 CAD Model Analyzer 的模块设计、数据流和关键 OpenCASCADE API。目标是让面试官或代码阅读者快速理解：一个 STEP 文件如何被转换成结构化 JSON 分析报告，以及如何做基础模型质量判断。
 
 ---
 
@@ -18,14 +18,16 @@ part.step / part.stp
 
 ```json
 {
+  "metadata": {},
   "topology": {},
   "curves": {},
   "surfaces": {},
-  "metrics": {}
+  "metrics": {},
+  "quality": {}
 }
 ```
 
-核心目标不是渲染模型，而是做 **CAD 数据解析和几何分析**。
+核心目标不是渲染模型，而是做 **CAD 数据解析、B-Rep 分析和基础模型质量检查**。
 
 ---
 
@@ -48,7 +50,7 @@ part.step / part.stp
 │                                                       │
 │  ┌─────────────────┐  ┌──────────────────────┐        │
 │  │ TopologyCounter │  │ GeometryClassifier   │        │
-│  │ 拓扑统计         │  │ 曲线/曲面分类          │        │
+│  │ 拓扑统计 + 质检  │  │ 曲线/曲面分类          │        │
 │  └─────────────────┘  └──────────────────────┘        │
 │                                                       │
 │  ┌─────────────────┐                                  │
@@ -56,7 +58,7 @@ part.step / part.stp
 │  │ 尺寸/质量属性     │                                  │
 │  └─────────────────┘                                  │
 └──────┬────────────────────────────────────────────────┘
-       │ Stats + Metrics
+       │ Stats + Metrics + Quality
        ▼
 ┌────────────────────┐
 │ JsonReport          │
@@ -82,18 +84,21 @@ part.step / part.stp
 1. 解析命令行参数。
 2. 调用 `readStepFile` 读取 STEP。
 3. 调用各分析模块生成统计结果。
-4. 调用 `buildJsonReport` 生成 JSON。
-5. 写入输出文件并打印到控制台。
+4. 记录分析耗时 `analysis_time_ms`。
+5. 调用 `buildJsonReport` 生成 JSON。
+6. 写入输出文件并打印到控制台。
 
 主流程伪代码：
 
 ```cpp
+auto start = std::chrono::steady_clock::now();
 TopoDS_Shape shape = readStepFile(inputFile);
 TopologyStats topology = countTopology(shape);
 CurveStats curves = classifyCurves(shape);
 SurfaceStats surfaces = classifySurfaces(shape);
 ShapeMetrics metrics = measureShape(shape);
-std::string report = buildJsonReport(inputFile, topology, curves, surfaces, metrics);
+auto elapsedMs = ...;
+std::string report = buildJsonReport(inputFile, version, elapsedMs, topology, curves, surfaces, metrics);
 writeTextFile(outputFile, report);
 ```
 
@@ -101,6 +106,7 @@ writeTextFile(outputFile, report);
 
 - `main.cpp` 不直接写分析细节，只做编排。
 - 各分析模块可以独立扩展和测试。
+- metadata 输出版本和耗时，便于后续做批量处理和性能对比。
 
 ---
 
@@ -135,7 +141,7 @@ writeTextFile(outputFile, report);
 - `include/TopologyCounter.h`
 - `src/TopologyCounter.cpp`
 
-职责：统计 B-Rep 拓扑对象数量。
+职责：统计 B-Rep 拓扑对象数量，并做基础模型质量检查。
 
 输出结构：
 
@@ -148,6 +154,9 @@ struct TopologyStats {
     int shell;
     int solid;
     int compound;
+    int freeEdge;
+    int nonManifoldEdge;
+    int eulerCharacteristic;
 };
 ```
 
@@ -156,13 +165,11 @@ struct TopologyStats {
 - `TopExp_Explorer`
 - `TopAbs_VERTEX`
 - `TopAbs_EDGE`
-- `TopAbs_WIRE`
 - `TopAbs_FACE`
-- `TopAbs_SHELL`
-- `TopAbs_SOLID`
-- `TopAbs_COMPOUND`
+- `TopExp::MapShapesAndAncestors`
+- `TopTools_IndexedDataMapOfShapeListOfShape`
 
-实现思路：
+拓扑计数实现思路：
 
 ```cpp
 for (TopExp_Explorer explorer(shape, TopAbs_FACE); explorer.More(); explorer.Next()) {
@@ -170,9 +177,20 @@ for (TopExp_Explorer explorer(shape, TopAbs_FACE); explorer.More(); explorer.Nex
 }
 ```
 
+自由边 / 非流形边检查思路：
+
+```cpp
+TopTools_IndexedDataMapOfShapeListOfShape edgeFaceMap;
+TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edgeFaceMap);
+for each edge:
+    adjacentFaceCount = edgeFaceMap[edge].Extent();
+    if adjacentFaceCount < 2: free edge
+    if adjacentFaceCount > 2: non-manifold edge
+```
+
 面试讲解点：
 
-> OpenCASCADE 中 CAD 模型是拓扑和几何组合形成的。这里统计的是拓扑层面的对象，例如 Face、Edge 和 Vertex，而不是三角网格顶点。
+> OpenCASCADE 中 CAD 模型是拓扑和几何组合形成的。这里统计的是拓扑层面的对象，例如 Face、Edge 和 Vertex，而不是三角网格顶点。进一步通过 Edge 到 Face 的邻接关系，可以判断开放边和非流形边，这比单纯读文件更接近 CAD 模型质量检查。
 
 ---
 
@@ -327,23 +345,35 @@ diagonal = sqrt(dx * dx + dy * dy + dz * dz);
 
 职责：将分析结果序列化为 JSON。
 
+输出结构：
+
+```json
+{
+  "metadata": {
+    "analyzer": "cad_model_analyzer",
+    "version": "0.2.0",
+    "input_file": "samples/screw.step",
+    "analysis_time_ms": 20
+  },
+  "topology": {
+    "free_edge": 0,
+    "non_manifold_edge": 0,
+    "euler_characteristic": 54
+  },
+  "quality": {
+    "closed_solid_candidate": true,
+    "has_free_edges": false,
+    "has_non_manifold_edges": false,
+    "has_positive_volume": true
+  }
+}
+```
+
 设计取舍：
 
 - 当前没有引入第三方 JSON 库，使用 `std::ostringstream` 手动生成 JSON。
 - 好处是项目依赖简单，适合小型命令行工具和面试展示。
 - 后续如果扩展复杂字段，可以替换为 `nlohmann/json`。
-
-输出结构：
-
-```json
-{
-  "file": "part.step",
-  "topology": {},
-  "curves": {},
-  "surfaces": {},
-  "metrics": {}
-}
-```
 
 ---
 
@@ -422,10 +452,14 @@ D:\CodeProj\CoreEngine\occt-combined-release-no-pch\opencascade-8.0.0-vc14-64\da
 - 关键拓扑数量符合预期。
 - 关键曲线/曲面统计符合预期。
 - `metrics` 字段存在，且包围盒、面积、体积、质心有效。
+- `metadata` 字段存在，版本和分析耗时有效。
+- `quality` 字段存在，自由边、非流形边、闭合实体候选判断符合预期。
 
 ---
 
 ## 后续可扩展方向
+
+详细路线见：[`docs/roadmap.md`](roadmap.md)
 
 ### 1. 模型质量检查
 
@@ -434,8 +468,8 @@ D:\CodeProj\CoreEngine\occt-combined-release-no-pch\opencascade-8.0.0-vc14-64\da
 - 是否为空模型
 - 是否多 Solid
 - 是否只有 Shell 没有 Solid
-- 是否存在开放边
-- 是否存在非流形边
+- 开放边详情
+- 非流形边详情
 - 体积是否为 0
 
 ### 2. 批量分析
@@ -471,7 +505,7 @@ cad_model_analyzer.exe --batch models -o reports
 1. `README.md`：理解项目目标和能力边界。
 2. `src/main.cpp`：理解主流程。
 3. `src/StepReader.cpp`：理解 STEP 读取。
-4. `src/TopologyCounter.cpp`：理解拓扑遍历。
+4. `src/TopologyCounter.cpp`：理解拓扑遍历和基础质检。
 5. `src/GeometryClassifier.cpp`：理解拓扑到几何的转换。
 6. `src/ShapeMetrics.cpp`：理解工程属性计算。
 7. `src/JsonReport.cpp`：理解结果输出。
@@ -491,4 +525,4 @@ cad_model_analyzer.exe --batch models -o reports
 
 原因：
 
-> 当前目标是作为面试展示项目，重点展示 CAD 文件解析、B-Rep 分析和 C++ 工程化能力，而不是做完整商业 CAD 软件。
+> 当前目标是作为面试展示项目，重点展示 CAD 文件解析、B-Rep 分析、模型质量检查和 C++ 工程化能力，而不是做完整商业 CAD 软件。

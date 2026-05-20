@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "analyzer": "cad_model_analyzer",
+    "version": "0.2.0",
+    "input_file": "samples/screw.step",
+    "analysis_time_ms": 20
+  },
+  "file": "samples/screw.step",
+  "topology": {
+    "vertex": 88,
+    "edge": 44,
+    "wire": 10,
+    "face": 10,
+    "shell": 1,
+    "solid": 1,
+    "compound": 0,
+    "free_edge": 0,
+    "non_manifold_edge": 0,
+    "euler_characteristic": 54
+  },
+  "curves": {
+    "line": 10,
+    "circle": 20,
+    "ellipse": 0,
+    "bspline_curve": 14,
+    "other": 0
+  },
+  "surfaces": {
+    "plane": 4,
+    "cylinder": 1,
+    "sphere": 0,
+    "cone": 2,
+    "torus": 3,
+    "bspline_surface": 0,
+    "other": 0
+  },
+  "metrics": {
+    "bounding_box": {
+      "xmin": -27.8984,
+      "ymin": -10.8266,
+      "zmin": -34.564,
+      "xmax": -7.89781,
+      "ymax": 9.174,
+      "zmax": 7.73649,
+      "dx": 20.0006,
+      "dy": 20.0006,
+      "dz": 42.3005,
+      "center": {
+        "x": -17.8981,
+        "y": -0.826297,
+        "z": -13.4137
+      },
+      "diagonal": 50.8859
+    },
+    "surface_area": 1929.33,
+    "volume": 3788.27,
+    "center_of_mass": {
+      "x": -17.8981,
+      "y": -0.826298,
+      "z": -11.1583
+    }
+  },
+  "quality": {
+    "closed_solid_candidate": true,
+    "has_free_edges": false,
+    "has_non_manifold_edges": false,
+    "has_positive_volume": true
+  }
+}
