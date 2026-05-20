@@ -1,0 +1,36 @@
+# Build outputs
+build/
+out/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+compile_commands.json
+
+# Generated analyzer output
+output/
+*.json
+!docs/**/*.json
+
+# Windows / IDE
+.vs/
+.vscode/.browse.VC.db
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+.DS_Store
+Thumbs.db
+
+# Binaries and libraries
+*.exe
+*.dll
+*.lib
+*.obj
+*.pdb
+*.ilk
+
+# Temporary dependency logs
+*-deps*.txt
+deps-*.txt
+resolve-deps*.txt
+all-dll-deps.txt
