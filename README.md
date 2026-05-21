@@ -244,6 +244,12 @@ D:\CodeProj\cad-model-analyzer\run-analyzer.bat --help
 D:\CodeProj\cad-model-analyzer\run-analyzer.bat --version
 ```
 
+`--help` 会列出三类信息：
+
+- 命令格式：单文件分析、`-o` 指定输出、批量分析。
+- 报告内容：`metadata`、`topology`、`curves`、`surfaces`、`metrics`、`quality`。
+- 质量状态：`ok`、`empty`、`open_shell`、`non_manifold`、`multi_solid`、`shell_only`、`invalid_volume`。
+
 批量分析目录并输出每个模型的 JSON 和 CSV 汇总：
 
 ```bat
@@ -361,6 +367,56 @@ OK: screw.step report matches expected counts, metrics, and CLI options
   }
 }
 ```
+
+---
+
+## 输出字段说明
+
+### JSON 主要字段
+
+- `metadata`：分析器名称、版本、输入文件路径和分析耗时。
+- `topology`：B-Rep 拓扑统计，包括点、边、线框、面、壳、实体、复合体，以及边-面邻接关系。
+- `curves`：Edge 背后的曲线类型统计，例如直线、圆、椭圆和 B 样条曲线。
+- `surfaces`：Face 背后的曲面类型统计，例如平面、圆柱面、圆锥面、圆环面和 B 样条曲面。
+- `metrics`：包围盒、表面积、体积和质心等几何/质量属性。
+- `quality`：面向批量筛选的质量判断结果。
+
+### topology 重点字段
+
+- `free_edge`：边界边数量，即没有被两个 Face 正常共享的边。数量大于 0 时通常说明模型存在开放边界。
+- `manifold_edge`：被两个 Face 共享的正常流形边数量。
+- `non_manifold_edge`：被超过两个 Face 共享的边。数量大于 0 时通常说明拓扑关系异常。
+- `max_edge_face_adjacency`：单条边最多被多少个 Face 共享，用于定位非流形复杂度。
+- `euler_characteristic`：`V - E + F`，用于辅助观察拓扑结构。
+
+### quality 重点字段
+
+- `closed_solid_candidate`：基于单实体、无自由边、无非流形边和正体积的闭合实体候选判断。
+- `status`：综合状态。常见值包括：
+  - `ok`：未发现基础拓扑/体积异常。
+  - `empty`：未识别到有效拓扑对象。
+  - `open_shell`：存在开放边界。
+  - `non_manifold`：存在非流形边。
+  - `multi_solid`：存在多个 Solid。
+  - `shell_only`：存在 Shell/Face，但没有 Solid。
+  - `invalid_volume`：存在 Solid，但体积不是正数。
+- `issue_count`：基础问题数量，便于排序和筛选。
+- `complexity_level`：基于拓扑规模的复杂度等级，当前为 `low`、`medium`、`high`。
+
+### CSV 汇总字段
+
+批量模式的 `summary.csv` 面向快速筛选，字段含义如下：
+
+- `file`：输入 STEP/STP 文件名。
+- `status`：文件处理状态，`ok` 表示读取和分析成功，`error` 表示该文件失败。
+- `quality_status`：模型质量状态，对应 JSON 中的 `quality.status`。
+- `complexity_level`：复杂度等级。
+- `issue_count`：基础问题数量。
+- `solid` / `face` / `edge`：主要拓扑规模。
+- `free_edge` / `manifold_edge` / `non_manifold_edge` / `max_edge_face_adjacency`：边-面邻接质量指标。
+- `volume` / `surface_area`：体积和表面积。
+- `analysis_time_ms`：单个模型分析耗时。
+- `report`：对应的详细 JSON 文件名。
 
 ---
 
