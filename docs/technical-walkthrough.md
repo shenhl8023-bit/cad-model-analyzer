@@ -1,127 +1,375 @@
-# CAD Model Analyzer 技术讲解稿
+# CAD Model Analyzer 技术说明
 
-这份文档用于快速说明项目目标、模块设计、关键技术点和可扩展方向。
-
----
-
-## 30 秒版本
-
-> CAD Model Analyzer 是一个基于 C++17 和 OpenCASCADE 的 CAD 模型分析工具。它可以读取 STEP 文件，把模型解析成 OpenCASCADE 的 `TopoDS_Shape`，然后遍历 B-Rep 拓扑结构，统计 Vertex、Edge、Face、Solid 等对象，识别常见曲线和曲面类型，计算包围盒、表面积、体积和质心，并检查自由边、非流形边等基础模型质量问题，最后输出 JSON/CSV 报告。
+本文档面向代码维护和二次开发，说明项目的处理流程、模块边界、关键 OpenCASCADE API、输出格式和后续扩展点。
 
 ---
 
-## 2 分钟版本
+## 1. 项目定位
 
-> 项目选择 STEP 作为输入格式，因为 STEP 是工业场景中常见的 CAD 中性文件格式。整体流程是先通过 `STEPControl_Reader` 读取 STEP 文件，得到 OpenCASCADE 的 `TopoDS_Shape`。
->
-> 分析逻辑拆成几个模块：`TopologyCounter` 负责拓扑统计和基础质量检查；`GeometryClassifier` 通过 `BRep_Tool::Curve` 和 `BRep_Tool::Surface` 识别 Edge 背后的曲线类型和 Face 背后的曲面类型；`ShapeMetrics` 使用 `BRepBndLib` 和 `BRepGProp` 计算包围盒、表面积、体积和质心；最后 `JsonReport` 把结果输出为 JSON。
->
-> 工程化方面，项目使用 CMake + Ninja + MSVC 构建，并提供 `build-windows.bat`、`run-analyzer.bat` 和 `test-screw.bat`。运行脚本统一处理 OpenCASCADE 在 Windows 下的 DLL 依赖，回归测试使用 OCCT 自带的 `screw.step` 验证核心输出字段。
+CAD Model Analyzer 是一个命令行 CAD 数据分析工具，当前重点处理 STEP/STP 文件。它不负责建模和渲染，而是把 CAD 文件转换成可程序消费的结构化分析结果。
+
+核心能力：
+
+- 读取 STEP/STP 文件并转换为 OpenCASCADE 的 `TopoDS_Shape`。
+- 遍历 B-Rep 拓扑对象，统计 Vertex、Edge、Wire、Face、Shell、Solid、Compound。
+- 识别 Edge 对应的曲线类型和 Face 对应的曲面类型。
+- 计算包围盒、表面积、体积、质心等工程属性。
+- 检查自由边、非流形边和闭合实体候选状态。
+- 输出 JSON 报告；批量模式下同时输出 CSV 汇总。
+
+适合的集成场景：
+
+- CAD 模型入库前的基础检查。
+- STEP 文件批量统计和资产索引。
+- 模型质检、报价、重量估算或复杂度评估的前置数据提取。
+- Web/API 服务中的 CAD 分析后端模块。
 
 ---
 
-## 5 分钟深入讲解版本
-
-### 1. 项目目标
-
-目标是把 CAD STEP 文件转换成可程序消费的结构化数据，而不是只做文件读取或图形显示。输出 JSON/CSV 后，可以继续接入模型质检、数据库、报价系统或 Web 服务。
-
-### 2. 数据流
+## 2. 高层处理流程
 
 ```text
-STEP 文件
-   ↓ STEPControl_Reader
+STEP/STP 文件
+   ↓
+StepReader
+   ↓
 TopoDS_Shape
    ↓
-拓扑遍历 / 几何分类 / 属性计算
+Analysis Layer
+   ├─ TopologyCounter     拓扑统计和基础质量检查
+   ├─ GeometryClassifier  曲线/曲面类型识别
+   └─ ShapeMetrics        包围盒、面积、体积、质心
+   ↓
+JsonReport
    ↓
 JSON 报告 / CSV 汇总
 ```
 
-STEP 文件读入后，OpenCASCADE 给到的是一个 `TopoDS_Shape`。它可能包含 Compound、Solid、Shell、Face、Wire、Edge、Vertex 等不同层级，后续分析都围绕这个 Shape 展开。
-
-### 3. 拓扑统计
-
-对应文件：
-
-- `src/TopologyCounter.cpp`
-
-拓扑统计使用 `TopExp_Explorer`，它可以从一个 `TopoDS_Shape` 中遍历指定类型，例如 `TopAbs_FACE` 或 `TopAbs_EDGE`。项目把统计逻辑封装成 `countShapeType`，分别统计 Vertex、Edge、Wire、Face、Shell、Solid 和 Compound。
-
-自由边和非流形边检查使用 `TopExp::MapShapesAndAncestors` 建立 Edge 到 Face 的邻接关系：
-
-- 被少于 2 个 Face 使用的边记为自由边。
-- 被超过 2 个 Face 使用的边记为非流形边。
-
-### 4. 几何分类
-
-对应文件：
-
-- `src/GeometryClassifier.cpp`
-
-Edge 和 Face 是拓扑对象，本身不直接说明它是直线、圆、平面还是圆柱面。项目通过：
-
-- `BRep_Tool::Curve(edge, first, last)` 获取 Edge 背后的 `Geom_Curve`。
-- `BRep_Tool::Surface(face)` 获取 Face 背后的 `Geom_Surface`。
-- `IsKind(STANDARD_TYPE(...))` 判断具体曲线/曲面类型。
-
-### 5. 尺寸和质量属性
-
-对应文件：
-
-- `src/ShapeMetrics.cpp`
-
-包围盒使用 `BRepBndLib::Add` 计算，得到最小最大坐标后计算 dx、dy、dz、中心点和空间对角线。
-
-表面积使用 `BRepGProp::SurfaceProperties`，体积和质心使用 `BRepGProp::VolumeProperties`。这些属性可以用于模型检查、报价、重量估算和加工复杂度评估。
-
-### 6. 输出设计
-
-对应文件：
-
-- `src/JsonReport.cpp`
-
-项目输出 JSON，而不是只打印文本，目的是方便后续被 Web 服务、数据库或前端页面消费。批量模式还会生成 `summary.csv`，适合对目录中的多个模型进行快速汇总。
-
-### 7. 工程化部分
-
-对应文件：
-
-- `CMakeLists.txt`
-- `build-windows.bat`
-- `run-analyzer.bat`
-- `test-screw.bat`
-
-C++ 项目使用 CMake 管理源码和 OpenCASCADE 链接库。Windows 下 OCCT 运行时依赖较多，脚本中统一配置 OCCT 和第三方库 PATH。`test-screw.bat` 是最小回归测试，用于验证程序能启动、命令行参数可用、分析结果关键字段正确。
+主程序只负责编排流程：解析参数、读取模型、调用分析模块、记录耗时、生成报告、写入输出文件。
 
 ---
 
-## 常见技术问题
+## 3. 模块说明
 
-### Q1：为什么选 OpenCASCADE？
+### 3.1 `StepReader`
 
-OpenCASCADE 是开源 CAD 几何内核，支持 STEP/IGES/BREP 等格式，提供拓扑遍历、几何曲线曲面、布尔运算和质量属性计算等能力，适合作为 CAD 数据处理工具的底层库。
+文件：
 
-### Q2：STEP 文件读进来以后是什么结构？
+- `include/StepReader.h`
+- `src/StepReader.cpp`
 
-读进来以后核心对象是 `TopoDS_Shape`。它是一个通用拓扑对象，可以表示 Compound、Solid、Shell、Face、Wire、Edge、Vertex。具体分析时用 `TopExp_Explorer` 按类型遍历。
+职责：读取 STEP/STP 文件，并返回 OpenCASCADE 内部的 `TopoDS_Shape`。
 
-### Q3：拓扑和几何有什么区别？
+关键 API：
 
-拓扑描述连接关系，比如模型有哪些 Face、Edge、Vertex，它们如何组成实体；几何描述具体形状，比如一条 Edge 底层是直线还是圆，一张 Face 底层是平面还是圆柱面。OpenCASCADE 里需要通过 `BRep_Tool` 从拓扑对象取到底层几何对象。
+- `STEPControl_Reader`
+- `ReadFile`
+- `TransferRoots`
+- `OneShape`
 
-### Q4：怎么识别曲线和曲面类型？
+实现要点：
 
-对 Edge 调用 `BRep_Tool::Curve` 获取 `Geom_Curve`，然后用 `IsKind(STANDARD_TYPE(Geom_Line))` 等判断类型。Face 类似，调用 `BRep_Tool::Surface` 获取 `Geom_Surface`，判断 Plane、Cylinder、Sphere、Cone、Torus、BSplineSurface 等。
+- STEP 是中性 CAD 交换格式，读取后需要转换成 OpenCASCADE 的 B-Rep 表达。
+- `TopoDS_Shape` 是后续拓扑遍历、几何分类和属性计算的统一入口。
+- 读取失败应抛出明确异常，避免后续模块处理空模型或无效模型。
 
-### Q5：面积、体积和质心怎么计算？
+### 3.2 `TopologyCounter`
 
-OpenCASCADE 提供了 `BRepGProp`。表面积使用 `BRepGProp::SurfaceProperties`，体积和质心使用 `BRepGProp::VolumeProperties`。得到的 `GProp_GProps` 里 `Mass()` 对 surface properties 表示面积，对 volume properties 表示体积，`CentreOfMass()` 可以拿到质心。
+文件：
 
-### Q6：项目里有哪些工程难点？
+- `include/TopologyCounter.h`
+- `src/TopologyCounter.cpp`
 
-主要是 Windows 下 OCCT 运行依赖。程序能编译通过不代表能运行，因为 exe 依赖 OCCT DLL，OCCT DLL 又依赖 TBB、FreeType、jemalloc、MSVC runtime 等第三方库。项目通过运行脚本统一配置 PATH，并在构建脚本中复制核心 OCCT DLL，减少环境差异导致的运行失败。
+职责：统计基础拓扑对象，并输出基础质量指标。
 
-### Q7：项目还可以怎么扩展？
+输出字段包括：
 
-可以继续增强模型质量检查，例如空模型、多实体、Shell-only、开放边详情和非流形边详情；也可以支持 IGES/BREP/STL 输入，或封装成 Web API，让上层系统上传 STEP 文件后返回模型尺寸、体积、面积、复杂度和质量状态。
+- `vertex`
+- `edge`
+- `wire`
+- `face`
+- `shell`
+- `solid`
+- `compound`
+- `free_edge`
+- `non_manifold_edge`
+- `euler_characteristic`
+
+关键 API：
+
+- `TopExp_Explorer`
+- `TopAbs_VERTEX` / `TopAbs_EDGE` / `TopAbs_FACE` 等拓扑类型
+- `TopExp::MapShapesAndAncestors`
+- `TopTools_IndexedDataMapOfShapeListOfShape`
+
+自由边和非流形边的判断逻辑：
+
+```text
+建立 Edge -> Face 邻接关系
+遍历每条 Edge：
+  adjacentFaceCount < 2  => free_edge
+  adjacentFaceCount > 2  => non_manifold_edge
+```
+
+说明：
+
+- 拓扑对象描述连接关系，不等同于网格顶点或三角面。
+- 自由边通常意味着开放壳、缺面或边界边。
+- 非流形边通常意味着模型拓扑不适合直接用于某些后续处理，例如实体布尔、网格划分或加工分析。
+
+### 3.3 `GeometryClassifier`
+
+文件：
+
+- `include/GeometryClassifier.h`
+- `src/GeometryClassifier.cpp`
+
+职责：识别 Edge 底层曲线类型和 Face 底层曲面类型。
+
+曲线类型：
+
+- Line
+- Circle
+- Ellipse
+- BSplineCurve
+- Other
+
+曲面类型：
+
+- Plane
+- Cylinder
+- Sphere
+- Cone
+- Torus
+- BSplineSurface
+- Other
+
+关键 API：
+
+- `BRep_Tool::Curve`
+- `BRep_Tool::Surface`
+- `IsKind(STANDARD_TYPE(...))`
+
+实现要点：
+
+- Edge 和 Face 是拓扑对象，本身不直接说明几何类型。
+- 需要通过 `BRep_Tool` 取得底层 `Geom_Curve` 或 `Geom_Surface`。
+- 类型识别结果适合用于模型复杂度评估、规则检查和后续统计分析。
+
+### 3.4 `ShapeMetrics`
+
+文件：
+
+- `include/ShapeMetrics.h`
+- `src/ShapeMetrics.cpp`
+
+职责：计算模型尺寸和质量属性。
+
+输出指标：
+
+- bounding box 最小/最大坐标。
+- bounding box 尺寸 `dx / dy / dz`。
+- bounding box 中心点。
+- bounding box 空间对角线长度。
+- 表面积。
+- 体积。
+- 质心。
+
+关键 API：
+
+- `Bnd_Box`
+- `BRepBndLib::Add`
+- `BRepGProp::SurfaceProperties`
+- `BRepGProp::VolumeProperties`
+- `GProp_GProps`
+
+实现要点：
+
+- `SurfaceProperties(...).Mass()` 表示表面积。
+- `VolumeProperties(...).Mass()` 表示体积。
+- `CentreOfMass()` 返回质心坐标。
+- 对非封闭模型，体积和质心可能没有业务意义，调用方应结合 `quality` 字段判断。
+
+### 3.5 `JsonReport`
+
+文件：
+
+- `include/JsonReport.h`
+- `src/JsonReport.cpp`
+
+职责：把分析结果序列化为 JSON。
+
+报告结构：
+
+```json
+{
+  "metadata": {},
+  "topology": {},
+  "curves": {},
+  "surfaces": {},
+  "metrics": {},
+  "quality": {}
+}
+```
+
+设计考虑：
+
+- JSON 字段使用 `snake_case`，便于脚本、前端和数据库处理。
+- `metadata` 包含工具名称、版本、输入文件和分析耗时。
+- `quality` 聚合基础判断结果，调用方可以快速判断模型是否适合后续流程。
+- 当前使用 `std::ostringstream` 生成 JSON，保持依赖简单；如果字段变复杂，可以替换为 `nlohmann/json`。
+
+---
+
+## 4. 命令行接口
+
+单文件分析：
+
+```bat
+cad_model_analyzer.exe input.step -o output.json
+```
+
+兼容旧写法：
+
+```bat
+cad_model_analyzer.exe input.step output.json
+```
+
+批量分析：
+
+```bat
+cad_model_analyzer.exe --batch models -o reports
+```
+
+帮助和版本：
+
+```bat
+cad_model_analyzer.exe --help
+cad_model_analyzer.exe --version
+```
+
+批量模式输出：
+
+- `summary.csv`：每个模型一行，包含状态、实体数、面数、边数、自由边、非流形边、体积、面积、耗时和报告文件。
+- `<model-name>.json`：每个模型的完整 JSON 分析报告。
+
+---
+
+## 5. 构建和运行脚本
+
+项目提供 Windows 脚本，减少手动配置环境的步骤。
+
+### `build-windows.bat`
+
+用途：配置 MSVC x64 环境，调用 CMake + Ninja 构建 Release 版本。
+
+### `run-analyzer.bat`
+
+用途：设置 OCCT 和第三方 DLL 的 PATH，然后运行分析程序。
+
+Windows 下仅编译通过不代表可以直接运行，因为 OpenCASCADE DLL 还依赖 TBB、FreeType、jemalloc、MSVC runtime 等第三方库。运行脚本集中处理这些路径，避免调用者手动设置环境变量。
+
+### `test-screw.bat`
+
+用途：运行最小回归测试，验证：
+
+- 程序可以启动。
+- `--help`、`--version` 可用。
+- `-o` 参数和旧版参数写法可用。
+- 单文件分析输出关键字段。
+- 批量模式可以生成 JSON 和 CSV。
+- `screw.step` 的关键拓扑、几何、metrics、quality 字段符合预期。
+
+---
+
+## 6. 输出字段说明
+
+### `metadata`
+
+记录分析过程信息：
+
+- `analyzer`：工具名称。
+- `version`：工具版本。
+- `input_file`：输入文件路径。
+- `analysis_time_ms`：分析耗时。
+
+### `topology`
+
+记录拓扑统计和基础拓扑质量指标：
+
+- Vertex / Edge / Wire / Face / Shell / Solid / Compound 数量。
+- `free_edge`：自由边数量。
+- `non_manifold_edge`：非流形边数量。
+- `euler_characteristic`：欧拉特征数。
+
+### `curves` / `surfaces`
+
+记录常见曲线和曲面类型数量，适合用于模型复杂度和几何构成分析。
+
+### `metrics`
+
+记录包围盒、表面积、体积、质心等工程属性。
+
+### `quality`
+
+记录基础质量判断：
+
+- `closed_solid_candidate`
+- `has_free_edges`
+- `has_non_manifold_edges`
+- `has_positive_volume`
+
+---
+
+## 7. 后续扩展点
+
+### 模型质量检查增强
+
+- 空模型检查。
+- 多 Solid 检查。
+- Shell-only 模型检查。
+- 开放边详情列表。
+- 非流形边详情列表。
+- 零体积或异常体积检查。
+- 面/边数量复杂度等级。
+
+### 更多格式支持
+
+- IGES
+- BREP
+- STL
+
+### 服务化和可视化
+
+- 封装 HTTP API：上传 STEP/STP，返回 JSON 分析报告。
+- 增加简单 Web 页面展示 topology、metrics、quality。
+- 对接数据库，形成 CAD 模型资产索引。
+- 导出缩略图或轻量级预览数据。
+
+---
+
+## 8. 代码阅读顺序
+
+建议按以下顺序阅读：
+
+1. `src/main.cpp`：命令行参数和主流程。
+2. `src/StepReader.cpp`：STEP 读取。
+3. `src/TopologyCounter.cpp`：拓扑统计和质量检查。
+4. `src/GeometryClassifier.cpp`：曲线和曲面识别。
+5. `src/ShapeMetrics.cpp`：包围盒、面积、体积、质心。
+6. `src/JsonReport.cpp`：JSON 输出。
+7. `test-screw.bat`：回归测试逻辑。
+
+---
+
+## 9. 设计边界
+
+当前项目刻意保持轻量：
+
+- 不实现完整 CAD 建模器。
+- 不实现三维渲染引擎。
+- 不提供 GUI。
+- 不引入数据库。
+- 不覆盖所有 CAD 模型质量问题。
+
+这样可以把项目边界集中在 CAD 数据解析、B-Rep 分析、基础模型质量检查和结构化输出上，便于后续作为独立模块集成到更大的系统中。
