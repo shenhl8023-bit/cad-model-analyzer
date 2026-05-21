@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CAD Model Analyzer</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">STEP/STP CAD 分析</p>
+        <h1>CAD Model Analyzer</h1>
+        <p class="subtitle">上传 STEP 模型，调用本地 OpenCASCADE 分析器，输出拓扑、几何、尺寸和质量状态。</p>
+      </div>
+      <div id="health" class="health">检查服务中...</div>
+    </section>
+
+    <section class="card upload-card">
+      <label class="file-picker">
+        <input id="file" type="file" accept=".step,.stp" />
+        <span>选择 .step / .stp 文件</span>
+      </label>
+      <button id="analyze" type="button">开始分析</button>
+      <p id="message" class="message">请选择一个 STEP/STP 文件。</p>
+    </section>
+
+    <section id="summary" class="grid hidden">
+      <article class="metric"><span>质量状态</span><strong id="qualityStatus">-</strong></article>
+      <article class="metric"><span>复杂度</span><strong id="complexity">-</strong></article>
+      <article class="metric"><span>问题数</span><strong id="issueCount">-</strong></article>
+      <article class="metric"><span>分析耗时</span><strong id="analysisTime">-</strong></article>
+      <article class="metric"><span>Solid</span><strong id="solidCount">-</strong></article>
+      <article class="metric"><span>Face</span><strong id="faceCount">-</strong></article>
+      <article class="metric"><span>Edge</span><strong id="edgeCount">-</strong></article>
+      <article class="metric"><span>Volume</span><strong id="volume">-</strong></article>
+    </section>
+
+    <section id="details" class="card hidden">
+      <h2>关键判断</h2>
+      <ul id="checks" class="checks"></ul>
+    </section>
+
+    <section id="jsonCard" class="card hidden">
+      <div class="section-title">
+        <h2>完整 JSON 报告</h2>
+        <button id="copy" type="button" class="secondary">复制 JSON</button>
+      </div>
+      <pre id="json"></pre>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

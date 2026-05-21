@@ -10,8 +10,15 @@ compile_commands.json
 output/
 *.json
 !docs/**/*.json
+!package.json
+!package-lock.json
 
-# Windows / IDE
+# Node / web UI
+node_modules/
+.env
+.env.*
+!.env.example
+npm-debug.log*
 .vs/
 .vscode/.browse.VC.db
 *.user

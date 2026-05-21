@@ -26,6 +26,7 @@ CAD Model Analyzer 是一个基于 C++17 和 OpenCASCADE 的 CAD 模型分析工
 - **工程指标计算**：输出 bounding box、包围盒中心、对角线长度、表面积、体积、质心。
 - **模型质量检查**：统计 free edge、non-manifold edge，判断是否为闭合实体候选模型。
 - **结构化输出**：输出 metadata、topology、curves、surfaces、metrics、quality，包含 `status`、`issue_count`、`complexity_level` 等字段，便于接入 Web、数据库、报价系统或模型质检流程。
+- **轻量 Web 分析界面**：提供本地 Web 页面上传 STEP/STP 文件，调用现有分析器并展示质量状态、复杂度、关键拓扑指标和完整 JSON。
 - **工程化脚本**：提供 Windows 下构建、运行和回归测试脚本，处理 OCCT/第三方 DLL 依赖路径。
 - **文档化说明**：模块边界清晰，便于理解 CAD 数据从文件到结构化报告的完整流程。
 
@@ -38,7 +39,8 @@ CAD Model Analyzer 是一个基于 C++17 和 OpenCASCADE 的 CAD 模型分析工
 - 构建系统：CMake + Ninja
 - 编译环境：Visual Studio 2022 MSVC x64
 - 平台：Windows
-- 输出格式：JSON
+- 输出格式：JSON / CSV
+- 可选 Web 层：Node.js + Fastify
 
 ---
 
@@ -177,7 +179,17 @@ cad-model-analyzer/
     TopologyCounter.cpp
     GeometryClassifier.cpp
     ShapeMetrics.cpp
+    QualityAssessment.cpp
     JsonReport.cpp
+  tests/
+    quality_assessment_tests.cpp
+  web/
+    server.js
+    smoke-test.js
+    public/
+      index.html
+      app.js
+      style.css
   docs/
     architecture.md
     technical-walkthrough.md
@@ -269,12 +281,66 @@ D:\CodeProj\cad-model-analyzer\run-analyzer.bat D:\CodeProj\CoreEngine\occt-comb
 
 ---
 
+## Web 分析界面
+
+Web 层是对现有命令行分析器的轻量封装：浏览器上传 STEP/STP 文件，Node.js 服务把文件保存到本地临时目录，调用 `cad_model_analyzer.exe` 生成 JSON，再把质量状态、复杂度、关键拓扑指标和完整 JSON 返回给前端展示。
+
+安装依赖：
+
+```bat
+cd /d D:\CodeProj\cad-model-analyzer
+npm install
+```
+
+启动前先确保 C++ 分析器已经构建完成：
+
+```bat
+D:\CodeProj\cad-model-analyzer\build-windows.bat
+```
+
+启动 Web 服务：
+
+```bat
+npm run web
+```
+
+默认访问地址：
+
+```text
+http://127.0.0.1:3307
+```
+
+可配置环境变量见 `.env.example`：
+
+- `CAD_WEB_HOST`：监听地址，默认 `127.0.0.1`。
+- `CAD_WEB_PORT`：监听端口，默认 `3307`。
+- `CAD_ANALYZER_EXE`：`cad_model_analyzer.exe` 路径。
+- `CAD_UPLOAD_DIR`：上传 STEP/STP 文件保存目录。
+- `CAD_REPORT_DIR`：分析报告保存目录。
+- `CAD_MAX_UPLOAD_MB`：最大上传体积，默认 50 MB。
+
+Web smoke test：
+
+```bat
+npm run web:smoke
+```
+
+Web 层当前定位是本地交互分析界面，不包含账号、权限、数据库或大型 CAD 预览器。实际部署时建议放在内网或受控环境中，通过反向代理限制访问范围。
+
+---
+
 ## 测试
 
 运行最小回归测试：
 
 ```bat
 D:\CodeProj\cad-model-analyzer\test-screw.bat
+```
+
+运行 Web 层 smoke test：
+
+```bat
+npm run web:smoke
 ```
 
 测试内容：
@@ -284,6 +350,7 @@ D:\CodeProj\cad-model-analyzer\test-screw.bat
 - `-o output.json` 写法可用
 - 旧版 `input.step output.json` 写法可用
 - `--batch input_dir -o output_dir` 批量分析可用
+- Web 服务健康检查、首页和 STEP 上传分析链路可用
 - `screw.step` 的关键拓扑/几何统计符合预期
 - metadata、metrics、quality 字段存在
 - free edge / non-manifold edge / closed solid candidate / status / complexity level 等质检字段符合预期
