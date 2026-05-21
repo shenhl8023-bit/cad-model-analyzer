@@ -1,7 +1,7 @@
 {
   "metadata": {
     "analyzer": "cad_model_analyzer",
-    "version": "0.3.0",
+    "version": "0.5.0",
     "input_file": "samples/screw.step",
     "analysis_time_ms": 20
   },
@@ -14,8 +14,18 @@
     "shell": 1,
     "solid": 1,
     "compound": 0,
+    "isolated_edge": 0,
     "free_edge": 0,
+    "manifold_edge": 22,
     "non_manifold_edge": 0,
+    "max_edge_face_adjacency": 2,
+    "edge_face_adjacency": {
+      "isolated": 0,
+      "boundary": 0,
+      "manifold": 22,
+      "non_manifold": 0,
+      "max_faces_per_edge": 2
+    },
     "euler_characteristic": 54
   },
   "curves": {
@@ -64,6 +74,12 @@
     "closed_solid_candidate": true,
     "has_free_edges": false,
     "has_non_manifold_edges": false,
-    "has_positive_volume": true
+    "has_positive_volume": true,
+    "is_empty": false,
+    "multi_solid": false,
+    "shell_only": false,
+    "issue_count": 0,
+    "status": "ok",
+    "complexity_level": "low"
   }
 }

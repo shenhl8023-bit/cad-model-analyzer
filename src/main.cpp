@@ -1,5 +1,6 @@
 #include "Analysis.h"
 #include "JsonReport.h"
+#include "QualityAssessment.h"
 
 #include <windows.h>
 
@@ -13,7 +14,7 @@
 #include <vector>
 
 namespace {
-constexpr const char* kVersion = "0.3.0";
+constexpr const char* kVersion = "0.5.0";
 
 struct CliOptions {
     std::string inputFile;
@@ -155,7 +156,7 @@ int runBatch(const CliOptions& options) {
     std::sort(inputFiles.begin(), inputFiles.end());
 
     std::ostringstream summary;
-    summary << "file,status,solid,face,edge,free_edge,non_manifold_edge,volume,surface_area,analysis_time_ms,report\n";
+    summary << "file,status,quality_status,complexity_level,issue_count,solid,face,edge,free_edge,manifold_edge,non_manifold_edge,max_edge_face_adjacency,volume,surface_area,analysis_time_ms,report\n";
 
     int failures = 0;
     for (const auto& inputFile : inputFiles) {
@@ -173,19 +174,26 @@ int runBatch(const CliOptions& options) {
                 result.metrics);
             writeTextFile(reportPath, report);
 
+            const QualityAssessment quality = assessQuality(result.topology, result.metrics);
+
             summary << csvEscape(inputFile.filename().string()) << ",ok,"
+                    << quality.status << ','
+                    << quality.complexityLevel << ','
+                    << quality.issueCount << ','
                     << result.topology.solid << ','
                     << result.topology.face << ','
                     << result.topology.edge << ','
                     << result.topology.freeEdge << ','
+                    << result.topology.manifoldEdge << ','
                     << result.topology.nonManifoldEdge << ','
+                    << result.topology.maxEdgeFaceAdjacency << ','
                     << result.metrics.volume << ','
                     << result.metrics.surfaceArea << ','
                     << result.analysisTimeMs << ','
                     << csvEscape(std::filesystem::path(reportPath).filename().string()) << "\n";
         } catch (const std::exception& ex) {
             ++failures;
-            summary << csvEscape(inputFile.filename().string()) << ",error,,,,,,,,,"
+            summary << csvEscape(inputFile.filename().string()) << ",error,,,,,,,,,,,,,,"
                     << csvEscape(ex.what()) << "\n";
             std::cerr << "Error analyzing " << inputPath << ": " << ex.what() << "\n";
         }

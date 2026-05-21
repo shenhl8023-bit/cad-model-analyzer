@@ -10,8 +10,11 @@ struct TopologyStats {
     int shell = 0;
     int solid = 0;
     int compound = 0;
+    int isolatedEdge = 0;
     int freeEdge = 0;
+    int manifoldEdge = 0;
     int nonManifoldEdge = 0;
+    int maxEdgeFaceAdjacency = 0;
     int eulerCharacteristic = 0;
 };
 

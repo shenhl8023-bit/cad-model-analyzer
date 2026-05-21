@@ -19,10 +19,21 @@ add_executable(cad_model_analyzer
     src/TopologyCounter.cpp
     src/GeometryClassifier.cpp
     src/ShapeMetrics.cpp
+    src/QualityAssessment.cpp
     src/JsonReport.cpp
 )
 
+add_executable(quality_assessment_tests
+    tests/quality_assessment_tests.cpp
+    src/QualityAssessment.cpp
+)
+
 target_include_directories(cad_model_analyzer PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${OpenCASCADE_INCLUDE_DIR}
+)
+
+target_include_directories(quality_assessment_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${OpenCASCADE_INCLUDE_DIR}
 )

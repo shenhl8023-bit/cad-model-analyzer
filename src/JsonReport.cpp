@@ -1,5 +1,7 @@
 #include "JsonReport.h"
 
+#include "QualityAssessment.h"
+
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -21,6 +23,7 @@ std::string jsonEscape(const std::string& value) {
     }
     return out.str();
 }
+
 }
 
 std::string buildJsonReport(
@@ -31,11 +34,7 @@ std::string buildJsonReport(
     const CurveStats& curves,
     const SurfaceStats& surfaces,
     const ShapeMetrics& metrics) {
-    const bool closedSolidCandidate =
-        topology.solid == 1 &&
-        topology.freeEdge == 0 &&
-        topology.nonManifoldEdge == 0 &&
-        metrics.volume > 0.0;
+    const QualityAssessment quality = assessQuality(topology, metrics);
 
     std::ostringstream json;
     json << "{\n";
@@ -54,8 +53,18 @@ std::string buildJsonReport(
     json << "    \"shell\": " << topology.shell << ",\n";
     json << "    \"solid\": " << topology.solid << ",\n";
     json << "    \"compound\": " << topology.compound << ",\n";
+    json << "    \"isolated_edge\": " << topology.isolatedEdge << ",\n";
     json << "    \"free_edge\": " << topology.freeEdge << ",\n";
+    json << "    \"manifold_edge\": " << topology.manifoldEdge << ",\n";
     json << "    \"non_manifold_edge\": " << topology.nonManifoldEdge << ",\n";
+    json << "    \"max_edge_face_adjacency\": " << topology.maxEdgeFaceAdjacency << ",\n";
+    json << "    \"edge_face_adjacency\": {\n";
+    json << "      \"isolated\": " << topology.isolatedEdge << ",\n";
+    json << "      \"boundary\": " << (topology.freeEdge - topology.isolatedEdge) << ",\n";
+    json << "      \"manifold\": " << topology.manifoldEdge << ",\n";
+    json << "      \"non_manifold\": " << topology.nonManifoldEdge << ",\n";
+    json << "      \"max_faces_per_edge\": " << topology.maxEdgeFaceAdjacency << "\n";
+    json << "    },\n";
     json << "    \"euler_characteristic\": " << topology.eulerCharacteristic << "\n";
     json << "  },\n";
     json << "  \"curves\": {\n";
@@ -101,10 +110,16 @@ std::string buildJsonReport(
     json << "    }\n";
     json << "  },\n";
     json << "  \"quality\": {\n";
-    json << "    \"closed_solid_candidate\": " << (closedSolidCandidate ? "true" : "false") << ",\n";
-    json << "    \"has_free_edges\": " << (topology.freeEdge > 0 ? "true" : "false") << ",\n";
-    json << "    \"has_non_manifold_edges\": " << (topology.nonManifoldEdge > 0 ? "true" : "false") << ",\n";
-    json << "    \"has_positive_volume\": " << (metrics.volume > 0.0 ? "true" : "false") << "\n";
+    json << "    \"closed_solid_candidate\": " << (quality.closedSolidCandidate ? "true" : "false") << ",\n";
+    json << "    \"has_free_edges\": " << (quality.hasFreeEdges ? "true" : "false") << ",\n";
+    json << "    \"has_non_manifold_edges\": " << (quality.hasNonManifoldEdges ? "true" : "false") << ",\n";
+    json << "    \"has_positive_volume\": " << (quality.hasPositiveVolume ? "true" : "false") << ",\n";
+    json << "    \"is_empty\": " << (quality.isEmpty ? "true" : "false") << ",\n";
+    json << "    \"multi_solid\": " << (quality.multiSolid ? "true" : "false") << ",\n";
+    json << "    \"shell_only\": " << (quality.shellOnly ? "true" : "false") << ",\n";
+    json << "    \"issue_count\": " << quality.issueCount << ",\n";
+    json << "    \"status\": \"" << quality.status << "\",\n";
+    json << "    \"complexity_level\": \"" << quality.complexityLevel << "\"\n";
     json << "  }\n";
     json << "}\n";
     return json.str();

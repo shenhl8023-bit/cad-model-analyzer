@@ -5,6 +5,8 @@
 #include <TopExp_Explorer.hxx>
 #include <TopTools_IndexedDataMapOfShapeListOfShape.hxx>
 
+#include <algorithm>
+
 namespace {
 int countShapeType(const TopoDS_Shape& shape, TopAbs_ShapeEnum type) {
     int count = 0;
@@ -30,8 +32,14 @@ TopologyStats countTopology(const TopoDS_Shape& shape) {
     TopExp::MapShapesAndAncestors(shape, TopAbs_EDGE, TopAbs_FACE, edgeFaceMap);
     for (int i = 1; i <= edgeFaceMap.Extent(); ++i) {
         const int adjacentFaceCount = edgeFaceMap.FindFromIndex(i).Extent();
-        if (adjacentFaceCount < 2) {
+        stats.maxEdgeFaceAdjacency = std::max(stats.maxEdgeFaceAdjacency, adjacentFaceCount);
+        if (adjacentFaceCount == 0) {
+            ++stats.isolatedEdge;
             ++stats.freeEdge;
+        } else if (adjacentFaceCount == 1) {
+            ++stats.freeEdge;
+        } else if (adjacentFaceCount == 2) {
+            ++stats.manifoldEdge;
         } else if (adjacentFaceCount > 2) {
             ++stats.nonManifoldEdge;
         }

@@ -351,13 +351,23 @@ diagonal = sqrt(dx * dx + dy * dy + dz * dz);
 {
   "metadata": {
     "analyzer": "cad_model_analyzer",
-    "version": "0.3.0",
+    "version": "0.5.0",
     "input_file": "samples/screw.step",
     "analysis_time_ms": 20
   },
   "topology": {
+    "isolated_edge": 0,
     "free_edge": 0,
+    "manifold_edge": 22,
     "non_manifold_edge": 0,
+    "max_edge_face_adjacency": 2,
+    "edge_face_adjacency": {
+      "isolated": 0,
+      "boundary": 0,
+      "manifold": 22,
+      "non_manifold": 0,
+      "max_faces_per_edge": 2
+    },
     "euler_characteristic": 54
   },
   "quality": {
@@ -482,7 +492,7 @@ cad_model_analyzer.exe --batch models -o reports
 
 输出：
 
-- `reports/summary.csv`：汇总每个模型的状态、实体数、面数、边数、自由边、非流形边、体积、面积、耗时和 JSON 文件名。
+- `reports/summary.csv`：汇总每个模型的处理状态、质量状态、复杂度等级、问题数、实体数、面数、边数、自由边、流形边、非流形边、最大边-面邻接数、体积、面积、耗时和 JSON 文件名。
 - `reports/<model>.json`：每个模型的完整分析报告。
 
 这部分把单模型分析扩展成批处理能力，便于后续接入模型库、报价系统或质检流水线。
@@ -495,7 +505,7 @@ cad_model_analyzer.exe --batch models -o reports
 - BREP
 - STL
 
-### 4. Web/GUI 展示
+### 4. Web/GUI 查看
 
 将当前命令行工具封装为：
 

@@ -1,2 +1,2 @@
-file,status,solid,face,edge,free_edge,non_manifold_edge,volume,surface_area,analysis_time_ms,report
-screw.step,ok,1,10,44,0,0,3788.27,1929.33,20,screw.json
+file,status,quality_status,complexity_level,issue_count,solid,face,edge,free_edge,manifold_edge,non_manifold_edge,max_edge_face_adjacency,volume,surface_area,analysis_time_ms,report
+screw.step,ok,ok,low,0,1,10,44,0,22,0,2,3788.27,1929.33,20,screw.json
