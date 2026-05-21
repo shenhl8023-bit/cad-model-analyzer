@@ -379,8 +379,6 @@ OK: screw.step report matches expected counts, metrics, and CLI options
 
 ---
 
-## 技术交流时可以重点说明
-
 ### 1. 为什么做这个项目
 
 CAD/CAE 软件不是普通文本或图片处理，核心数据结构是 B-Rep 几何拓扑。这个项目用 OpenCASCADE 读取 STEP 文件，把复杂 CAD 模型转换成可分析、可存储、可展示的结构化数据。
