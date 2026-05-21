@@ -1,6 +1,6 @@
 # CAD Model Analyzer 架构说明
 
-本文档说明 CAD Model Analyzer 的模块设计、数据流和关键 OpenCASCADE API。目标是让面试官或代码阅读者快速理解：一个 STEP 文件如何被转换成结构化 JSON 分析报告，以及如何做基础模型质量判断。
+本文档说明 CAD Model Analyzer 的模块设计、数据流和关键 OpenCASCADE API。目标是让代码阅读者快速理解：一个 STEP 文件如何被转换成结构化 JSON 分析报告，以及如何做基础模型质量判断。
 
 ---
 
@@ -188,7 +188,7 @@ for each edge:
     if adjacentFaceCount > 2: non-manifold edge
 ```
 
-面试讲解点：
+技术说明：
 
 > OpenCASCADE 中 CAD 模型是拓扑和几何组合形成的。这里统计的是拓扑层面的对象，例如 Face、Edge 和 Vertex，而不是三角网格顶点。进一步通过 Edge 到 Face 的邻接关系，可以判断开放边和非流形边，这比单纯读文件更接近 CAD 模型质量检查。
 
@@ -264,7 +264,7 @@ struct SurfaceStats {
 - `Geom_ToroidalSurface`
 - `Geom_BSplineSurface`
 
-面试讲解点：
+技术说明：
 
 > Edge/Face 是拓扑对象，Line/Circle/Plane/Cylinder 是几何对象。项目中通过 `BRep_Tool` 从拓扑对象取到底层几何对象，再判断具体类型。
 
@@ -330,7 +330,7 @@ diagonal = sqrt(dx * dx + dy * dy + dz * dz);
 - 对 VolumeProperties，`Mass()` 表示体积。
 - `CentreOfMass()` 返回质心坐标。
 
-面试讲解点：
+技术说明：
 
 > 这些指标可以用于工业场景中的模型尺寸分析、报价辅助、重量估算、复杂度评估或质量检查。
 
@@ -372,7 +372,7 @@ diagonal = sqrt(dx * dx + dy * dy + dz * dz);
 设计取舍：
 
 - 当前没有引入第三方 JSON 库，使用 `std::ostringstream` 手动生成 JSON。
-- 好处是项目依赖简单，适合小型命令行工具和面试展示。
+- 好处是项目依赖简单，适合小型命令行工具和轻量级工程模块。
 - 后续如果扩展复杂字段，可以替换为 `nlohmann/json`。
 
 ---
@@ -392,7 +392,7 @@ cad_model_analyzer.exe --version
 
 - 保留简单旧写法，方便快速测试。
 - 增加 `-o`，更接近常见 CLI 工具风格。
-- `--help` / `--version` 方便面试演示和脚本检查。
+- `--help` / `--version` 方便演示、排障和脚本检查。
 
 ---
 
@@ -505,7 +505,7 @@ cad_model_analyzer.exe --batch models -o reports
 
 ---
 
-## 面试官看代码时的推荐阅读顺序
+## 代码阅读推荐顺序
 
 1. `README.md`：理解项目目标和能力边界。
 2. `src/main.cpp`：理解主流程。
@@ -530,4 +530,4 @@ cad_model_analyzer.exe --batch models -o reports
 
 原因：
 
-> 当前目标是作为面试展示项目，重点展示 CAD 文件解析、B-Rep 分析、模型质量检查和 C++ 工程化能力，而不是做完整商业 CAD 软件。
+> 当前目标是实现一个轻量级 CAD 数据分析模块，重点覆盖 CAD 文件解析、B-Rep 分析、模型质量检查和 C++ 工程化能力，而不是做完整商业 CAD 软件。
